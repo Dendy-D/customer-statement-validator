@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon -r dotenv/config src/app.js",
-    "start": "node app.js"
+    "start": "node app.js",
+    "vercel-build": "echo server is running"
   },
   "dependencies": {
     "cors": "^2.8.5",
