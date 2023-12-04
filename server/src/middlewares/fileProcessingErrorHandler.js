@@ -1,4 +1,4 @@
-import FileProcessingError, { FileErrorCodes } from './errors/FileProcessingError/index.js';
+import { FileProcessingError, FileErrorCodes } from '../errors/FileProcessingError/index.js';
 
 function fileProcessingErrorHandler(err, req, res, next) {
   if (err instanceof FileProcessingError) {
