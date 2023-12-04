@@ -1,20 +1,25 @@
 const fileLoader = document.getElementById('fileLoader');
-const uploadedFile = document.getElementById('uploadedFile');
-const csvIcon = document.getElementById('csvIcon');
-const xmlIcon = document.getElementById('xmlIcon');
+const uploadedFileContainer = document.getElementById('uploadedFileContainer')
+const uploadedFileCsvIcon = document.getElementById('uploadedFileCsvIcon');
+const uploadedFileXmlIcon = document.getElementById('uploadedFileXmlIcon');
 const uploadedFileName = document.getElementById('uploadedFileName');
 const errorMessage = document.getElementById('errorMessage');
 const closeIcon = document.getElementById('closeIcon');
-const generateReport = document.getElementById('generateReport');
 const generateReportButton = document.getElementById('generateReportButton');
+const downloadReports = document.getElementById('downloadReports');
+const downloadingFileCsvIcon = document.getElementById('downloadingFileCsvIcon');
+const downloadingFileXmlIcon = document.getElementById('downloadingFileXmlIcon');
+const downloadingFileName = document.getElementById('downloadingFileName');
+const downloadedFile = document.getElementById('downloadedFile');
 
-const baseUrl = 'http://localhost:5000/api';
+const baseUrl = 'http://79.174.83.84:5000/api';
 
 let file;
+let url;
+let link;
 
 closeIcon.addEventListener('click', () => {
-  uploadedFile.style.display = 'none';
-  generateReport.style.display = 'none';
+  uploadedFileContainer.style.display = 'none';
   file = null;
 });
 
@@ -24,7 +29,11 @@ uploadedFileName.addEventListener('focusout', function() {
   const initialType = actualFile.type.split('/').slice(-1)[0];
   let currentType = this.textContent.split('.').slice(-1)[0];
 
-  if (this.textContent === '' || this.textContent === '.' + initialType || this.textContent === initialType) {
+  if (
+    this.textContent === '' ||
+    this.textContent === '.' + initialType ||
+    this.textContent === initialType
+  ) {
     this.textContent = actualFile.name;
   } else if (initialType !== currentType) {
     this.textContent = this.textContent + '.' + initialType;
@@ -38,27 +47,30 @@ function handleFileUpload(event) {
 
   const { type, name } = event.target.files[0];
   let timeoutId;
-  
+
   if (['text/xml', 'text/csv'].includes(type)) {
     file = event.target.files[0];
     clearTimeout(timeoutId);
 
+    downloadedFile.removeEventListener('click', downloadFileHandler)
+    URL.revokeObjectURL(url);
+
     errorMessage.classList.remove('error-message-show');
 
-    uploadedFile.style.display = 'flex';
-    generateReport.style.display = 'flex';
+    uploadedFileContainer.style.display = 'flex';
+    downloadReports.style.display = 'none';
 
     if (type === 'text/csv') {
-      csvIcon.style.display = 'block';
-      xmlIcon.style.display = 'none';
+      uploadedFileCsvIcon.style.display = 'block';
+      uploadedFileXmlIcon.style.display = 'none';
     }
 
     if (type === 'text/xml') {
-      xmlIcon.style.display = 'block';
-      csvIcon.style.display = 'none';
+      uploadedFileXmlIcon.style.display = 'block';
+      uploadedFileCsvIcon.style.display = 'none';
     }
 
-    uploadedFileName.textContent = name;    
+    uploadedFileName.textContent = name;
   } else {
     errorMessage.classList.add('error-message-show');
 
@@ -72,16 +84,80 @@ function handleFileUpload(event) {
   }
 }
 
+function showLoader() {
+  const loader = document.getElementById('loader');
+  loader.style.display = 'inline-block';
+}
+
+function hideLoader() {
+  const loader = document.getElementById('loader');
+  loader.style.display = 'none';
+}
+
 generateReportButton.addEventListener('click', async function() {
-  const formData = new FormData();
-  formData.append('file', file);
+  uploadedFileContainer.style.display = 'none';
+  let loading = true;
 
-  const response = await fetch(baseUrl + '/statement', {
-    method: 'POST',
-    body: formData,
-  });
+  try {
+    if (loading) {
+      showLoader();
+    }
 
-  const data = await response.json();
+    file = new File([file], uploadedFileName.textContent, {
+      type: file.type,
+      lastModified: file.lastModified,
+    });
 
-  console.log(data);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(baseUrl + '/statement', {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const errorResponse = await response.json();
+      throw new Error(errorResponse.message);
+    }
+
+    const blob = await response.blob();
+    
+    let fileType = blob.type.split('/')[1];
+    let fileTypeInHeaderFormat = fileType[0].toUpperCase() + fileType.slice(1);
+    
+    const fileName = response.headers.get(`${fileTypeInHeaderFormat}-File-Name`);
+
+    downloadReports.style.display = 'flex';
+
+    if (fileType === 'csv') {
+      downloadingFileCsvIcon.style.display = 'block';
+      downloadingFileXmlIcon.style.display = 'none';
+    }
+
+    if (fileType === 'xml') {
+      downloadingFileXmlIcon.style.display = 'block';
+      downloadingFileCsvIcon.style.display = 'none';
+    }
+    
+    downloadingFileName.textContent = fileName;
+
+    hideLoader();
+
+    downloadedFile.addEventListener('click', downloadFileHandler);
+
+    url = URL.createObjectURL(blob);
+
+    link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+  } catch (error) {
+    console.log('Error: ', error);
+    hideLoader();
+  }
 });
+
+function downloadFileHandler() {
+  link.click();
+}
