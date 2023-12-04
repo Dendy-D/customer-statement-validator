@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 5000;
 const SERVER_IP = process.env.SERVER_IP || 'localhost';
 
 const corsOptions = {
-  origin: 'http://127.0.0.1:46189',
+  origin: 'http://79.174.83.84:80',
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   credentials: true,
   optionsSuccessStatus: 204,
