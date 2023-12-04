@@ -1,7 +1,11 @@
 import { parse } from 'csv-parse/sync';
+import { stringify } from 'csv-stringify/sync';
 import parser from 'xml2json';
+import xmlFormatter from 'xml-formatter';
 
 import { FileProcessingError, FileErrorCodes } from './errors/FileProcessingError/index.js';
+import transactionValidation from './utils/transactionValidation.js';
+import preprocessData from './utils/preprocessData.js'
 
 function statementParser(req, res) {
   const file = req.file;
@@ -10,7 +14,7 @@ function statementParser(req, res) {
     throw new FileProcessingError('File is undefined', FileErrorCodes.FILE_UNDEFINED);
   }
 
-  const { originalName, buffer, mimetype } = file;
+  const { originalname, buffer, mimetype } = file;
 
   const fileType = mimetype.split('/').slice(-1)[0];
 
@@ -27,7 +31,20 @@ function statementParser(req, res) {
         skip_empty_lines: true,
       });
 
-      console.log(transactions);
+      const validatedTransanctions = transactionValidation(preprocessData(transactions, 'csv'), 'csv');
+
+      const headers = ['Reference', 'Description'];
+      const csvData = validatedTransanctions.map(({ reference, description }) => [reference, description]);
+
+      const csvString = stringify([headers, ...csvData]);
+
+      const reportName = originalname.split('.')[0] + 'Report';
+
+      res.setHeader('Content-Disposition', `attachment; filename=${reportName}.csv"`);
+      res.setHeader('Content-Type', 'application/csv');
+      res.setHeader('Csv-File-Name', `${reportName}.${fileType}`)
+
+      setTimeout(() => res.send(csvString), 1000);
     }
 
     if (fileType === 'xml') {
@@ -35,7 +52,23 @@ function statementParser(req, res) {
 
       const transactions = parser.toJson(xmlInStringRepresentation, { object: true }).records.record;
 
-      console.log(transactions);
+      const validatedTransanctions = transactionValidation(preprocessData(transactions, 'xml'), 'xml');
+
+      const xmlOfValidatedTransactions = `<records>${validatedTransanctions.map(record =>
+        `<record reference="${record.reference}">
+          <description>${record.description.trim()}</description>
+        </record>`
+      ).join('')}</records>`;
+
+      const xmlString = xmlFormatter(xmlOfValidatedTransactions, { indentation: '  ' });
+
+      const reportName = originalname.split('.')[0] + 'Report';
+
+      res.setHeader('Content-Disposition', `attachment; filename=${reportName}.xml"`);
+      res.setHeader('Content-Type', 'application/xml');
+      res.setHeader('Xml-File-Name', `${reportName}.${fileType}`);
+
+      setTimeout(() => res.send(xmlString), 1000);
     }
   } catch(e) {
     throw new FileProcessingError('File processing failed', FileErrorCodes.FILE_PROCESSING_FAILED);
